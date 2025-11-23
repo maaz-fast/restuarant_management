@@ -1,0 +1,66 @@
+:root {
+  --color-primary: #FF6B00;
+  --color-background: #FFFFFF;
+  --color-text: #1A1A1A;
+  --color-text-light: #666666;
+  --font-family: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+/* Primary button used across auth forms */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(255, 107, 0, 0.18);
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 10px 30px rgba(255, 107, 0, 0.22);
+  background: linear-gradient(90deg, #ff7a1a 0%, var(--color-primary) 100%);
+}
+
+.btn-primary:active {
+  transform: translateY(0px) scale(0.995);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+}
+
+/* Small utility for disabled state */
+.btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
