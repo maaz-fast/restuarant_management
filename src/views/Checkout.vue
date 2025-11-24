@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useCartStore } from '../stores/cart';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth'
 import { useToast } from '../composables/useToast'
+import { CreditCard, DollarSign } from 'lucide-vue-next'
 
 const cartStore = useCartStore();
 const router = useRouter();
@@ -17,15 +18,34 @@ const form = ref({
   phone: '',
   address: '',
   orderType: 'Delivery',
-  paymentMethod: 'Card'
+  paymentMethod: 'Cash'
 });
 
 const isSubmitting = ref(false);
+
+// card payment modal state
+const showCardModal = ref(false)
+const cardSaved = ref(false)
+const cardForm = ref({ holder: '', number: '', expiry: '', cvv: '' })
+const cardErrors = ref({ holder: '', number: '', expiry: '', cvv: '' })
+
+// open card modal immediately when user selects 'Card' and card not yet saved
+watch(() => form.value.paymentMethod, (val) => {
+  if (val === 'Card' && !cardSaved.value) {
+    showCardModal.value = true
+  }
+})
 
 const submitOrder = async () => {
   // require login/signup before placing order
   if (!auth.isAuthenticated) {
     showAuthPrompt.value = true
+    return
+  }
+
+  // if card payment selected but card details not saved, open card modal
+  if (form.value.paymentMethod === 'Card' && !cardSaved.value) {
+    showCardModal.value = true
     return
   }
 
@@ -55,13 +75,103 @@ function closeAuthPrompt() {
   showAuthPrompt.value = false
 }
 
-const discount = computed(() => {
-  return form.value.paymentMethod === 'Card' ? cartStore.totalPrice * 0.05 : 0;
-});
+function closeCardModal() {
+  showCardModal.value = false
+}
 
-const finalTotal = computed(() => {
-  return cartStore.totalPrice - discount.value;
-});
+function saveCardDetails() {
+  if (!validateCard()) {
+    // validation fills `cardErrors` with friendly per-field messages
+    toast.error('Please fix the card fields shown below')
+    return
+  }
+  cardSaved.value = true
+  showCardModal.value = false
+  toast.success('Card details saved')
+}
+
+function onCardNumberInput(e) {
+  // keep only digits and group every 4 digits
+  const raw = (e.target.value || '').replace(/\D+/g, '').slice(0, 19)
+  const parts = []
+  for (let i = 0; i < raw.length; i += 4) {
+    parts.push(raw.substr(i, 4))
+  }
+  cardForm.value.number = parts.join(' ')
+}
+
+function onExpiryInput(e) {
+  // numeric only, format MM/YY
+  const raw = (e.target.value || '').replace(/\D+/g, '').slice(0, 4)
+  if (raw.length <= 2) {
+    cardForm.value.expiry = raw
+  } else {
+    cardForm.value.expiry = raw.slice(0, 2) + '/' + raw.slice(2)
+  }
+}
+
+function onCvvInput(e) {
+  const raw = (e.target.value || '').replace(/\D+/g, '').slice(0, 4)
+  cardForm.value.cvv = raw
+}
+
+function validateCard() {
+  // reset errors
+  cardErrors.value = { holder: '', number: '', expiry: '', cvv: '' }
+  const c = cardForm.value
+
+  if (!c.holder || c.holder.trim().length < 2) {
+    cardErrors.value.holder = 'Enter the name on the card'
+  }
+
+  const digits = (c.number || '').replace(/\s+/g, '')
+  if (!/^\d{12,19}$/.test(digits)) {
+    cardErrors.value.number = 'Enter a valid card number (12–19 digits)'
+  }
+
+  // expiry validations: must be MM/YY or MM/YYYY and not expired
+  const expRaw = (c.expiry || '').replace(/\s+/g, '')
+  const parts = expRaw.split('/')
+  let month = null
+  let year = null
+  if (parts.length === 2) {
+    month = parts[0]
+    year = parts[1]
+  } else if (expRaw.length === 4) {
+    month = expRaw.slice(0, 2)
+    year = expRaw.slice(2)
+  }
+  if (!month || !/^\d{2}$/.test(month)) {
+    cardErrors.value.expiry = 'Expiry should be in MM/YY format'
+  } else {
+    const m = parseInt(month, 10)
+    if (!(m >= 1 && m <= 12)) {
+      cardErrors.value.expiry = 'Expiry month must be between 01 and 12'
+    } else if (year && /^\d{2,4}$/.test(year)) {
+      // normalize year to 4 digits
+      const y = year.length === 2 ? 2000 + parseInt(year, 10) : parseInt(year, 10)
+      const expDate = new Date(y, m - 1 + 1, 0) // last day of expiry month
+      const today = new Date()
+      // set time to end of day for comparison
+      expDate.setHours(23, 59, 59, 999)
+      if (expDate < today) {
+        cardErrors.value.expiry = 'Card has expired'
+      }
+    }
+  }
+
+  // CVV: require exactly 4 digits per request
+  if (!/^\d{4}$/.test(c.cvv || '')) {
+    cardErrors.value.cvv = 'CVV must be 3/4 digits'
+  }
+
+  // determine overall validity
+  const hasError = Object.values(cardErrors.value).some(Boolean)
+  return !hasError
+}
+
+const discount = computed(() => form.value.paymentMethod === 'Card' ? cartStore.totalPrice * 0.05 : 0);
+const finalTotal = computed(() => cartStore.totalPrice - discount.value);
 </script>
 
 <template>
@@ -108,10 +218,14 @@ const finalTotal = computed(() => {
           <h2>Payment Method</h2>
           <div class="radio-group">
             <label class="radio-label">
-              <input type="radio" v-model="form.paymentMethod" value="Card"> Card (5% Discount)
+              <input type="radio" v-model="form.paymentMethod" value="Card">
+              <span class="radio-custom"><CreditCard class="payment-icon" /></span>
+              <span>Card <small class="muted-text">(5% Discount)</small></span>
             </label>
             <label class="radio-label">
-              <input type="radio" v-model="form.paymentMethod" value="Cash"> Cash
+              <input type="radio" v-model="form.paymentMethod" value="Cash">
+              <span class="radio-custom"><DollarSign class="payment-icon" /></span>
+              <span>Cash</span>
             </label>
           </div>
         </section>
@@ -159,6 +273,41 @@ const finalTotal = computed(() => {
         <button class="btn-primary" @click="goToLogin">Login</button>
         <button class="btn-primary" @click="goToSignup">Signup</button>
         <button class="link-secondary" @click="closeAuthPrompt">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <!-- Card details modal -->
+  <div v-if="showCardModal" class="auth-prompt-overlay">
+    <div class="auth-prompt">
+      <h3>Enter card details</h3>
+      <p class="muted">We use secure payments. Enter card information to continue.</p>
+      <div class="card-form">
+        <div class="form-group">
+          <label>Cardholder Name</label>
+          <input type="text" v-model="cardForm.holder" placeholder="Full name on card">
+          <p class="field-error" v-if="cardErrors.holder">{{ cardErrors.holder }}</p>
+        </div>
+        <div class="form-group">
+          <label>Card Number</label>
+          <input type="text" v-model="cardForm.number" @input="onCardNumberInput" inputmode="numeric" autocomplete="cc-number" placeholder="1234 5678 9012 3456">
+          <p class="field-error" v-if="cardErrors.number">{{ cardErrors.number }}</p>
+        </div>
+        <div style="display:flex; gap:0.75rem">
+          <div class="form-group" style="flex:1">
+            <label>Expiry (MM/YY)</label>
+            <input type="text" v-model="cardForm.expiry" @input="onExpiryInput" inputmode="numeric" placeholder="MM/YY" maxlength="7">
+            <p class="field-error" v-if="cardErrors.expiry">{{ cardErrors.expiry }}</p>
+          </div>
+          <div class="form-group" style="width:130px">
+            <label>CVV</label>
+            <input type="password" v-model="cardForm.cvv" @input="onCvvInput" inputmode="numeric" maxlength="4" placeholder="1234">
+            <p class="field-error" v-if="cardErrors.cvv">{{ cardErrors.cvv }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="prompt-actions">
+        <button class="btn-primary" @click="saveCardDetails">Save & Continue</button>
+        <button class="link-secondary" @click="closeCardModal">Cancel</button>
       </div>
     </div>
   </div>
@@ -357,6 +506,74 @@ input:focus, textarea:focus {
   padding: 0.45rem 0.8rem;
   cursor: pointer;
 }
+
+/* Card modal tweaks reuse existing modal styles */
+.card-form input[type="text"], .card-form input[type="password"] {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+}
+
+.field-error {
+  color: #e74c3c;
+  font-size: 0.9rem;
+  margin-top: 0.35rem;
+}
+
+.payment-icon {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: 0 0 20px;
+  color: var(--color-primary);
+  display: block;
+}
+.radio-label span { display:inline-block }
+.radio-label > span:last-child { display:flex; align-items:center }
+.radio-custom .payment-icon { display:block; margin:auto; transform: translateY(4px); }
+.muted-text { font-size: 0.85rem; color: #666; margin-left: 0.35rem }
+
+/* custom radio */
+.radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+}
+.radio-label input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.radio-custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #eee;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  padding: 0; /* ensure icon is centered */
+}
+.radio-label input[type="radio"]:checked + .radio-custom {
+  background: #fff;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+}
+.radio-label:hover {
+  background: rgba(0,0,0,0.02);
+}
+.radio-label input[type="radio"]:focus + .radio-custom {
+  box-shadow: 0 0 0 4px rgba(0,0,0,0.06);
+}
+
 
 @media (max-width: 520px) {
   .auth-prompt { padding: 1rem; }
