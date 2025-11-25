@@ -9,7 +9,15 @@ import { RouterLink } from 'vue-router'
       <div class="top">
         <!-- Brand -->
         <div class="brand">
-          <h2>FoodieApp</h2>
+          <div class="brand-logo">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Fork -->
+              <path d="M9 2v7.5A2.5 2.5 0 0 0 11.5 12H12v9a1 1 0 0 0 2 0v-9h.5A2.5 2.5 0 0 0 17 9.5V2" stroke="#ff6b00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <!-- Knife -->
+              <path d="M3 2l2.5 2.5L3 7l2.5 2.5L3 12l2.5 2.5L3 17l2.5 2.5L3 22" stroke="#ff6b00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <h2>𝐅𝐨𝐨𝐝𝐢𝐞𝐀𝐩𝐩</h2>
+          </div>
           <p>Making food ordering and restaurant operations simple.</p>
         </div>
 
@@ -26,13 +34,13 @@ import { RouterLink } from 'vue-router'
         <!-- Contact Info -->
         <div class="contact">
           <h4>Contact</h4>
-          <p>Email: support@foodieapp.com</p>
-          <p>Phone: +92 300 1234567</p>
+          <p>Email: <a href="mailto:support@foodieapp.com" class="contact-link">maaz@foodieapp.com</a></p>
+          <p>Phone: <a href="tel:+923001234567" class="contact-link">+92 300 1234567</a></p>
         </div>
       </div>
 
       <div class="bottom">
-        <p>© 2024 FoodieApp — All Rights Reserved.</p>
+        <p>© 2025 FoodieApp — All Rights Reserved.</p>
       </div>
 
     </div>
@@ -61,9 +69,16 @@ import { RouterLink } from 'vue-router'
   margin-bottom: 2rem;
 }
 
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
 .brand h2 {
   color: var(--color-primary);
-  margin-bottom: 0.5rem;
+  margin: 0;
 }
 
 .links {
@@ -80,6 +95,16 @@ import { RouterLink } from 'vue-router'
 
 .links a:hover {
   color: var(--color-primary);
+}
+
+.contact-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: 0.2s;
+}
+
+.contact-link:hover {
+  text-decoration: underline;
 }
 
 .bottom {

@@ -11,7 +11,7 @@
 
       <p>
         For any questions, contact us at:  
-        <strong>support@foodieapp.com</strong>
+        <strong><a href="mailto:support@foodieapp.com" class="contact-link">maaz@foodieapp.com</a></strong>
       </p>
     </div>
   </div>

@@ -37,8 +37,13 @@ function handleLogout() {
     <div class="container">
       <!-- Logo -->
     <router-link to="/" class="logo">
+  <svg class="logo-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Fork -->
+    <path d="M9 2v7.5A2.5 2.5 0 0 0 11.5 12H12v9a1 1 0 0 0 2 0v-9h.5A2.5 2.5 0 0 0 17 9.5V2" stroke="#ff6b00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Knife -->
+    <path d="M3 2l2.5 2.5L3 7l2.5 2.5L3 12l2.5 2.5L3 17l2.5 2.5L3 22" stroke="#ff6b00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
   <span class="logo-text">𝐅𝐨𝐨𝐝𝐢𝐞𝐀𝐩𝐩</span>
-  <span class="logo-dot"></span>
 </router-link>
 
 
@@ -104,14 +109,15 @@ function handleLogout() {
   color: var(--color-text);
   display: flex;
   align-items: center;
+  gap: 0.5rem;
+}
+
+.logo-icon {
+  flex-shrink: 0;
 }
 
 .logo-text {
   color: var(--color-primary);
-}
-
-.logo-dot {
-  color: var(--color-text);
 }
 
 .nav-links {
@@ -206,10 +212,8 @@ function handleLogout() {
 <style scoped>
 .logo-text {
   display: inline-block;
-  padding: 0.25rem 0.75rem; /* adds space inside the rectangle */
-  border: 2px solid #f97316; /* orange border */
-  border-radius: 6px; /* rounded corners, optional */
-  background-color: #fff; /* rectangle background */
+  padding: 0.25rem 0.75rem;
+  background-color: #fff;
   font-weight: bold;
   color: #f97316;
 }

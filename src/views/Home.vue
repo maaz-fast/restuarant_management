@@ -1,17 +1,56 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useMenuStore } from '../stores/menu';
 import { useCartStore } from '../stores/cart';
-import { Plus } from 'lucide-vue-next';
+import { Plus, Star, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const menuStore = useMenuStore();
 const cartStore = useCartStore();
+
+const currentPage = ref(1);
+const itemsPerPage = 6;
 
 const filteredItems = computed(() => {
   if (menuStore.activeCategory === 'All') {
     return menuStore.items;
   }
   return menuStore.items.filter(item => item.category === menuStore.activeCategory);
+});
+
+const totalPages = computed(() => {
+  return Math.ceil(filteredItems.value.length / itemsPerPage);
+});
+
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  return filteredItems.value.slice(start, end);
+});
+
+const goToPage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+};
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+};
+
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+};
+
+// Reset to page 1 when category changes
+watch(() => menuStore.activeCategory, () => {
+  currentPage.value = 1;
 });
 
 const addToCart = (item) => {
@@ -41,13 +80,19 @@ const addToCart = (item) => {
       </div>
 
       <div class="menu-grid">
-        <div v-for="item in filteredItems" :key="item.id" class="menu-item">
+        <div v-for="item in paginatedItems" :key="item.id" class="menu-item">
           <div class="item-image">
             <img :src="item.image" :alt="item.name" loading="lazy" />
           </div>
           <div class="item-details">
             <div class="item-header">
-              <h3>{{ item.name }}</h3>
+              <div class="name-rating">
+                <div class="rating" v-if="item.rating !== undefined">
+                  <Star :size="16" />
+                  <span class="rating-value">{{ item.rating.toFixed(1) }}</span>
+                </div>
+                <h3>{{ item.name }}</h3>
+              </div>
               <span class="price">${{ item.price }}</span>
             </div>
             <p class="description">{{ item.description }}</p>
@@ -56,6 +101,34 @@ const addToCart = (item) => {
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="pagination">
+        <button 
+          @click="prevPage" 
+          :disabled="currentPage === 1"
+          class="pagination-btn"
+        >
+          <ChevronLeft :size="20" />
+        </button>
+
+        <button
+          v-for="page in totalPages"
+          :key="page"
+          @click="goToPage(page)"
+          :class="['pagination-number', { active: currentPage === page }]"
+        >
+          {{ page }}
+        </button>
+
+        <button 
+          @click="nextPage" 
+          :disabled="currentPage === totalPages"
+          class="pagination-btn"
+        >
+          <ChevronRight :size="20" />
+        </button>
       </div>
     </section>
   </div>
@@ -160,6 +233,26 @@ const addToCart = (item) => {
   margin-bottom: 0.5rem;
 }
 
+.name-rating {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #f5a623;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.rating-value {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
 .item-header h3 {
   font-size: 1.1rem;
   font-weight: 600;
@@ -193,5 +286,50 @@ const addToCart = (item) => {
 
 .add-btn:hover {
   background-color: var(--color-primary);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.pagination-btn,
+.pagination-number {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: white;
+  border: 1px solid #ddd;
+  color: var(--color-text);
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.pagination-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-btn:hover:not(:disabled),
+.pagination-number:hover {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-number.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
 }
 </style>
