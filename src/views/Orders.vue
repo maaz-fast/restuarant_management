@@ -1,11 +1,14 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useOrderStore } from '../stores/order';
-import { Clock, MapPin, CreditCard, Package, Star } from 'lucide-vue-next';
+import { Clock, MapPin, CreditCard, Package, Star, XCircle } from 'lucide-vue-next';
 import { useToast } from '../composables/useToast';
 
 const orderStore = useOrderStore();
 const toast = useToast();
+
+// Current time for countdown
+const currentTime = ref(Date.now());
 
 // Track review state for each order
 const reviewStates = ref({});
@@ -76,12 +79,115 @@ const cancelReview = (orderId) => {
   review.comment = '';
 };
 
+// Cancel Order functionality
+const cancelModal = ref({
+  isOpen: false,
+  orderId: null,
+  reason: '',
+  otherReason: ''
+});
+
+const cancellationReasons = [
+  'Changed my mind',
+  'Ordered by mistake',
+  'Taking too long',
+  'Found a better price elsewhere',
+  'Need to modify my order',
+  'Other'
+];
+
+// Timer update interval
+let timerInterval = null;
+
+onMounted(() => {
+  timerInterval = setInterval(() => {
+    currentTime.value = Date.now();
+  }, 1000);
+});
+
+onUnmounted(() => {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+  }
+});
+
+// Calculate if order can be cancelled and time remaining
+const canCancelOrder = (order) => {
+  if (order.status !== 'In Progress' && order.status !== 'Pending') return false;
+  
+  const orderTime = new Date(order.createdAt).getTime();
+  const fiveMinutes = 5 * 60 * 1000;
+  const elapsed = currentTime.value - orderTime;
+  
+  return elapsed < fiveMinutes;
+};
+
+const getTimeRemaining = (order) => {
+  const orderTime = new Date(order.createdAt).getTime();
+  const fiveMinutes = 5 * 60 * 1000;
+  const elapsed = currentTime.value - orderTime;
+  const remaining = fiveMinutes - elapsed;
+  
+  if (remaining <= 0) return '0:00';
+  
+  const minutes = Math.floor(remaining / 60000);
+  const seconds = Math.floor((remaining % 60000) / 1000);
+  
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const openCancelModal = (orderId) => {
+  cancelModal.value = {
+    isOpen: true,
+    orderId,
+    reason: '',
+    otherReason: ''
+  };
+};
+
+const closeCancelModal = () => {
+  cancelModal.value = {
+    isOpen: false,
+    orderId: null,
+    reason: '',
+    otherReason: ''
+  };
+};
+
+const confirmCancellation = () => {
+  const { orderId, reason, otherReason } = cancelModal.value;
+  
+  if (!reason) {
+    toast.error('Please select a cancellation reason');
+    return;
+  }
+  
+  if (reason === 'Other' && !otherReason.trim()) {
+    toast.error('Please provide a reason');
+    return;
+  }
+  
+  // TODO: Send cancellation to API
+  const finalReason = reason === 'Other' ? otherReason : reason;
+  console.log('Cancelling order:', orderId, 'Reason:', finalReason);
+  
+  // Update order status in dummy data (in real app, this would come from API response)
+  const order = dummyOrders.value.find(o => o.id === orderId);
+  if (order) {
+    order.status = 'Cancelled';
+  }
+  
+  toast.success('Order cancelled successfully');
+  closeCancelModal();
+};
+
 // Dummy orders for layout demonstration
 const dummyOrders = ref([
   {
     id: 'ORD-2024-001',
     date: '2024-11-25',
     time: '2:30 PM',
+    createdAt: '2024-11-25T14:30:00Z',
     status: 'Delivered',
     orderType: 'Delivery',
     paymentMethod: 'Card',
@@ -98,8 +204,9 @@ const dummyOrders = ref([
   },
   {
     id: 'ORD-2024-002',
-    date: '2024-11-24',
-    time: '6:45 PM',
+    date: '2024-11-26',
+    time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(), // 2 minutes ago
     status: 'In Progress',
     orderType: 'Pickup',
     paymentMethod: 'Cash',
@@ -117,6 +224,7 @@ const dummyOrders = ref([
     id: 'ORD-2024-003',
     date: '2024-11-24',
     time: '1:15 PM',
+    createdAt: '2024-11-24T13:15:00Z',
     status: 'Cancelled',
     orderType: 'Delivery',
     paymentMethod: 'Card',
@@ -203,6 +311,18 @@ const dummyOrders = ref([
             </div>
           </div>
 
+          <!-- Cancel Order Section -->
+          <div v-if="canCancelOrder(order)" class="cancel-section">
+            <div class="cancel-timer">
+              <Clock :size="14" />
+              Cancel available for {{ getTimeRemaining(order) }}
+            </div>
+            <button @click="openCancelModal(order.id)" class="cancel-order-btn">
+              <XCircle :size="16" />
+              Cancel Order
+            </button>
+          </div>
+
         </div>
 
         <!-- Review Section (Full Width Below Card) -->
@@ -262,6 +382,55 @@ const dummyOrders = ref([
     <!-- No orders message (when using real data) -->
     <div v-else class="no-orders">
       <p>No orders yet.</p>
+    </div>
+
+    <!-- Cancellation Modal -->
+    <div v-if="cancelModal.isOpen" class="modal-overlay" @click="closeCancelModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Cancel Order</h3>
+          <button @click="closeCancelModal" class="modal-close">
+            <XCircle :size="24" />
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <p class="modal-description">Please select a reason for cancelling this order:</p>
+          
+          <div class="reason-options">
+            <label 
+              v-for="reason in cancellationReasons" 
+              :key="reason"
+              class="reason-option"
+            >
+              <input 
+                type="radio" 
+                :value="reason" 
+                v-model="cancelModal.reason"
+                name="cancellation-reason"
+              />
+              <span class="reason-label">{{ reason }}</span>
+            </label>
+          </div>
+
+          <textarea
+            v-if="cancelModal.reason === 'Other'"
+            v-model="cancelModal.otherReason"
+            placeholder="Please specify your reason..."
+            class="other-reason-input"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button @click="closeCancelModal" class="btn-secondary">
+            Go Back
+          </button>
+          <button @click="confirmCancellation" class="btn-danger">
+            Confirm Cancellation
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -529,6 +698,200 @@ const dummyOrders = ref([
 .no-orders p {
   font-size: 1.1rem;
   color: var(--color-text-light);
+}
+
+/* Cancel Section */
+.cancel-section {
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid #e5e5e5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cancel-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.cancel-order-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.cancel-order-btn:hover {
+  background: #fecaca;
+  border-color: #fca5a5;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--color-text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.modal-close:hover {
+  color: var(--color-text);
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-description {
+  margin-bottom: 1.25rem;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.reason-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.reason-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reason-option:hover {
+  border-color: var(--color-primary);
+  background: #fff5eb;
+}
+
+.reason-option input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.reason-label {
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.other-reason-input {
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.other-reason-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e5e5;
+  justify-content: flex-end;
+}
+
+.btn-secondary,
+.btn-danger {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary {
+  background: #f5f5f5;
+  border: 1px solid #e5e5e5;
+  color: var(--color-text);
+}
+
+.btn-secondary:hover {
+  background: #e5e5e5;
+}
+
+.btn-danger {
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
 }
 
 /* Review Section */

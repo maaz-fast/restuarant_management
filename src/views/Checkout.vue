@@ -202,7 +202,7 @@ const finalTotal = computed(() => cartStore.totalPrice - discount.value);
           <h2>Personal Information</h2>
           <div class="form-group">
             <label for="name">Full Name</label>
-            <input type="text" id="name" v-model="form.name" required placeholder="John Doe">
+            <input type="text" id="name" v-model="form.name" required placeholder="Maaz Imtiaz">
           </div>
           <div class="form-group">
             <label for="phone">Phone Number</label>
@@ -210,7 +210,7 @@ const finalTotal = computed(() => cartStore.totalPrice - discount.value);
           </div>
           <div class="form-group" v-if="form.orderType === 'Delivery'">
             <label for="address">Delivery Address</label>
-            <textarea id="address" v-model="form.address" rows="3" placeholder="123 Main St, City"></textarea>
+            <textarea id="address" v-model="form.address" rows="3" placeholder="123 PECHS, Karachi"></textarea>
           </div>
         </section>
 
@@ -378,15 +378,43 @@ input:focus, textarea:focus {
 
 .radio-group {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
   flex-wrap: wrap;
 }
 
 .radio-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border: 2px solid #e5e5e5;
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+  font-weight: 500;
+}
+
+.radio-label:hover {
+  border-color: var(--color-primary);
+  background: #fff5eb;
+}
+
+.radio-label input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.radio-label input[type="radio"]:checked + * {
+  color: var(--color-primary);
+}
+
+.radio-label:has(input[type="radio"]:checked) {
+  border-color: var(--color-primary);
+  background: #fff5eb;
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.1);
 }
 
 .order-summary {
