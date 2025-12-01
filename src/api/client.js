@@ -1,10 +1,9 @@
 import axios from 'axios'
 
-const API_PREFIX = '/api/'
-
+// Base URL - most endpoints don't use /api prefix, only Contact does
 const baseURL = import.meta.env.DEV
-  ? API_PREFIX
-  : (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}${API_PREFIX}` : `https://localhost:7152${API_PREFIX}`)
+  ? '/'  // proxy in dev mode
+  : (import.meta.env.VITE_API_URL || 'https://localhost:7158/')
 
 // Helpful runtime log for debugging proxy/baseURL issues in dev
 if (import.meta.env.DEV) {
@@ -32,6 +31,9 @@ api.interceptors.request.use(
     if (token) {
       config.headers = config.headers || {}
       config.headers.Authorization = `Bearer ${token}`
+      console.log('Added Authorization header:', `Bearer ${token.substring(0, 20)}...`)
+    } else {
+      console.warn('No auth token found in localStorage')
     }
     return config
   },

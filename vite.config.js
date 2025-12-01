@@ -6,10 +6,31 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     proxy: {
+      // Proxy all API requests to backend
       '/api': {
-        target: 'https://localhost:7152',
+        target: 'https://localhost:7158',
         changeOrigin: true,
-        secure: false,
+        secure: false
+      },
+      '/user': {
+        target: 'https://localhost:7158',
+        changeOrigin: true,
+        secure: false
+      },
+      '/menu': {
+        target: 'https://localhost:7158',
+        changeOrigin: true,
+        secure: false
+      },
+      '/order': {
+        target: 'https://localhost:7158',
+        changeOrigin: true,
+        secure: false
+      },
+      '/get': {
+        target: 'https://localhost:7158',
+        changeOrigin: true,
+        secure: false
       }
     }
   }

@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useToast } from '../composables/useToast'
+import api from '../api/client'
 
 const toast = useToast()
 
@@ -15,12 +16,20 @@ const sendMessage = async () => {
   if (isLoading.value) return
   isLoading.value = true
   try {
-    // simulate async send (replace with real API call)
-    await new Promise((r) => setTimeout(r, 900))
-    toast.success('Message sent successfully!')
+    const response = await api.post('api/Contact/submitQuery', {
+      name: form.value.name,
+      email: form.value.email,
+      message: form.value.message
+    }, { skipAuth: true })
+    
+    const successMessage = response.data.payload?.message || 'Message sent successfully!'
+    toast.success(successMessage)
     form.value = { name: '', email: '', message: '' }
   } catch (err) {
-    toast.error('Failed to send message')
+    const errorMsg = err.response?.data?.error?.message || 
+                     err.response?.data?.message || 
+                     'Failed to send message'
+    toast.error(errorMsg)
   } finally {
     isLoading.value = false
   }

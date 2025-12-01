@@ -6,7 +6,9 @@ import Login from '../views/Login.vue'
 import Signup from '../views/Signup.vue'
 import Contact from '../views/Contact.vue'
 import PrivacyPolicy from '../views/PrivacyPolicy.vue'
-import Orders from '../views/Orders.vue' // if you have orders page
+import Orders from '../views/Orders.vue'
+import Profile from '../views/Profile.vue'
+import Checkout from '../views/Checkout.vue'
 
 const routes = [
   { path: '/', component: Home },
@@ -15,6 +17,8 @@ const routes = [
   { path: '/contact', component: Contact },
   { path: '/privacy-policy', component: PrivacyPolicy },
   { path: '/orders', component: Orders },
+  { path: '/profile', component: Profile },
+  { path: '/checkout', component: Checkout },
 ]
 
 const router = createRouter({

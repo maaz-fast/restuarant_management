@@ -12,6 +12,7 @@ const form = ref({
   name: '',
   email: '',
   password: '',
+  phone: '',
   address: ''
 })
 
@@ -21,8 +22,8 @@ const signup = async () => {
     toast.success('Account created successfully')
     router.push('/')
   } catch (err) {
-    const msg = err.response?.data?.message || err.response?.data || 'Signup failed'
-    toast.error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    const errorMsg = err.response?.data?.error?.message || err.response?.data?.message || 'Signup failed'
+    toast.error(errorMsg)
   }
 }
 </script>
@@ -34,14 +35,30 @@ const signup = async () => {
 
 
   <form @submit.prevent="signup" class="form-fields">
-    <label>Name</label>
-    <input type="text" v-model="form.name" required placeholder="Full name">
+    <div>
+      <label>Name</label>
+      <input type="text" v-model="form.name" required placeholder="Full name">
+    </div>
 
-    <label>Email</label>
-    <input type="email" v-model="form.email" required placeholder="Email">
+    <div>
+      <label>Email</label>
+      <input type="email" v-model="form.email" required placeholder="Email">
+    </div>
 
-    <label>Password</label>
-    <input type="password" v-model="form.password" required placeholder="Password">
+    <div>
+      <label>Password</label>
+      <input type="password" v-model="form.password" required placeholder="Password">
+    </div>
+
+    <div>
+      <label>Phone Number</label>
+      <input type="tel" v-model="form.phone" required placeholder="+1 234 567 8900">
+    </div>
+
+    <div>
+      <label>Address</label>
+      <textarea v-model="form.address" required placeholder="123 Main St, City" rows="3"></textarea>
+    </div>
 
     <button type="submit" class="btn-primary" :disabled="auth.isLoading">{{ auth.isLoading ? 'Creating...' : 'Create Account' }}</button>
 
@@ -49,8 +66,7 @@ const signup = async () => {
       Already have an account? 
       <router-link to="/login">Login</router-link>
     </p>
-    </form>
-    <p v-if="auth.error" class="error-text">{{ auth.error }}</p>
+  </form>
 </div>
 
 
@@ -87,13 +103,20 @@ const signup = async () => {
   gap: 0.5rem; /* tighter spacing between inputs */
 }
 
-.form-fields input {
+.form-fields input,
+.form-fields textarea {
   width: 100%;
   padding: 0.6rem; /* smaller input height */
   border-radius: 0.4rem;
   border: 1px solid #ccc;
   font-size: 0.9rem;
   box-sizing: border-box;
+  font-family: inherit;
+}
+
+.form-fields textarea {
+  resize: vertical; /* allow vertical resize only */
+  min-height: 80px;
 }
 
 .btn-primary {

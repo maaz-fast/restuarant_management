@@ -99,10 +99,18 @@ const cancellationReasons = [
 // Timer update interval
 let timerInterval = null;
 
-onMounted(() => {
+onMounted(async () => {
   timerInterval = setInterval(() => {
     currentTime.value = Date.now();
   }, 1000);
+  
+  // Fetch orders from API
+  try {
+    await orderStore.fetchOrders();
+  } catch (error) {
+    toast.error('Failed to load orders');
+    console.error('Error fetching orders:', error);
+  }
 });
 
 onUnmounted(() => {
@@ -171,8 +179,8 @@ const confirmCancellation = () => {
   const finalReason = reason === 'Other' ? otherReason : reason;
   console.log('Cancelling order:', orderId, 'Reason:', finalReason);
   
-  // Update order status in dummy data (in real app, this would come from API response)
-  const order = dummyOrders.value.find(o => o.id === orderId);
+  // Update order status
+  const order = orderStore.orders.find(o => o.id === orderId);
   if (order) {
     order.status = 'Cancelled';
   }
@@ -181,73 +189,21 @@ const confirmCancellation = () => {
   closeCancelModal();
 };
 
-// Dummy orders for layout demonstration
-const dummyOrders = ref([
-  {
-    id: 'ORD-2024-001',
-    date: '2024-11-25',
-    time: '2:30 PM',
-    createdAt: '2024-11-25T14:30:00Z',
-    status: 'Delivered',
-    orderType: 'Delivery',
-    paymentMethod: 'Card',
-    total: 42.97,
-    items: [
-      { name: 'Crispy Calamari', quantity: 2, price: 12.99 },
-      { name: 'Grilled Salmon', quantity: 1, price: 24.99 }
-    ],
-    customer: {
-      name: 'John Doe',
-      phone: '+1 234 567 8900',
-      address: '123 Main St, Apartment 4B, New York, NY 10001'
-    }
-  },
-  {
-    id: 'ORD-2024-002',
-    date: '2024-11-26',
-    time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-    createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(), // 2 minutes ago
-    status: 'In Progress',
-    orderType: 'Pickup',
-    paymentMethod: 'Cash',
-    total: 33.97,
-    items: [
-      { name: 'Classic Burger', quantity: 2, price: 15.99 },
-      { name: 'French Fries', quantity: 1, price: 4.99 }
-    ],
-    customer: {
-      name: 'Jane Smith',
-      phone: '+1 234 567 8901'
-    }
-  },
-  {
-    id: 'ORD-2024-003',
-    date: '2024-11-24',
-    time: '1:15 PM',
-    createdAt: '2024-11-24T13:15:00Z',
-    status: 'Cancelled',
-    orderType: 'Delivery',
-    paymentMethod: 'Card',
-    total: 18.98,
-    items: [
-      { name: 'Chocolate Lava Cake', quantity: 2, price: 9.99 }
-    ],
-    customer: {
-      name: 'Mike Johnson',
-      phone: '+1 234 567 8902',
-      address: '456 Oak Avenue, Suite 12, Brooklyn, NY 11201'
-    }
-  }
-]);
+// Removed dummyOrders - now using real data from orderStore
 </script>
 
 <template>
   <div class="orders-page container">
     <h1>All Orders</h1>
 
-    <!-- Show dummy orders for demo -->
-    <div v-if="dummyOrders.length > 0" class="orders-list">
-      <div v-for="order in dummyOrders" :key="order.id" class="order-card">
+    <!-- Loading State -->
+    <div v-if="orderStore.isLoading" class="loading-state">
+      <p>Loading orders...</p>
+    </div>
+
+    <!-- Orders List -->
+    <div v-else-if="orderStore.orders.length > 0" class="orders-list">
+      <div v-for="order in orderStore.orders" :key="order.id" class="order-card">
         
         <!-- Left Section: Order Info & Items -->
         <div class="card-left">

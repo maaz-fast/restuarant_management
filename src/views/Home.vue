@@ -1,11 +1,16 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted } from 'vue';
 import { useMenuStore } from '../stores/menu';
 import { useCartStore } from '../stores/cart';
-import { Plus, Star, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const menuStore = useMenuStore();
 const cartStore = useCartStore();
+
+// Fetch menu on component mount
+onMounted(() => {
+  menuStore.fetchMenu();
+});
 
 const currentPage = ref(1);
 const itemsPerPage = 6;
@@ -68,31 +73,34 @@ const addToCart = (item) => {
     </section>
 
     <section class="menu-section container">
-      <div class="categories">
-        <button 
-          v-for="category in menuStore.categories" 
-          :key="category"
-          :class="['category-btn', { active: menuStore.activeCategory === category }]"
-          @click="menuStore.setCategory(category)"
-        >
-          {{ category }}
-        </button>
+      <div v-if="menuStore.isLoading" class="loading-state">
+        <p>Loading menu...</p>
       </div>
 
-      <div class="menu-grid">
+      <div v-else-if="menuStore.error" class="error-state">
+        <p>{{ menuStore.error }}</p>
+      </div>
+
+      <template v-else>
+        <div class="categories">
+          <button 
+            v-for="category in menuStore.categories" 
+            :key="category"
+            :class="['category-btn', { active: menuStore.activeCategory === category }]"
+            @click="menuStore.setCategory(category)"
+          >
+            {{ category }}
+          </button>
+        </div>
+
+        <div class="menu-grid">
         <div v-for="item in paginatedItems" :key="item.id" class="menu-item">
           <div class="item-image">
             <img :src="item.image" :alt="item.name" loading="lazy" />
           </div>
           <div class="item-details">
             <div class="item-header">
-              <div class="name-rating">
-                <div class="rating" v-if="item.rating !== undefined">
-                  <Star :size="16" />
-                  <span class="rating-value">{{ item.rating.toFixed(1) }}</span>
-                </div>
-                <h3>{{ item.name }}</h3>
-              </div>
+              <h3>{{ item.name }}</h3>
               <span class="price">${{ item.price }}</span>
             </div>
             <p class="description">{{ item.description }}</p>
@@ -130,11 +138,24 @@ const addToCart = (item) => {
           <ChevronRight :size="20" />
         </button>
       </div>
+      </template>
     </section>
   </div>
 </template>
 
 <style scoped>
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  font-size: 1.1rem;
+  color: #666;
+}
+
+.error-state {
+  color: #d32f2f;
+}
+
 .hero {
   background-color: #fff5eb;
   padding: 4rem 0;
@@ -231,26 +252,6 @@ const addToCart = (item) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
-}
-
-.name-rating {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.rating {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: #f5a623;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.rating-value {
-  color: var(--color-text);
-  font-weight: 600;
 }
 
 .item-header h3 {

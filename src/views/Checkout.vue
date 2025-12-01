@@ -1,12 +1,14 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useCartStore } from '../stores/cart';
+import { useOrderStore } from '../stores/order';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth'
 import { useToast } from '../composables/useToast'
 import { CreditCard, DollarSign } from 'lucide-vue-next'
 
 const cartStore = useCartStore();
+const orderStore = useOrderStore();
 const router = useRouter();
 const auth = useAuthStore()
 const toast = useToast()
@@ -19,6 +21,15 @@ const form = ref({
   address: '',
   orderType: 'Delivery',
   paymentMethod: 'Cash'
+});
+
+// Populate form with user data on mount
+onMounted(() => {
+  if (auth.user) {
+    form.value.name = auth.user.name || ''
+    form.value.phone = auth.user.phoneNumber || ''
+    form.value.address = auth.user.address || ''
+  }
 });
 
 const isSubmitting = ref(false);
@@ -51,13 +62,37 @@ const submitOrder = async () => {
 
   isSubmitting.value = true;
   try {
-    // Replace this with real API call via order store when ready
-    await new Promise((r) => setTimeout(r, 1200))
+    // Debug: Check if token exists
+    const token = localStorage.getItem('auth_token');
+    console.log('Auth token exists:', !!token);
+    console.log('User authenticated:', auth.isAuthenticated);
+    
+    // Prepare order data
+    const orderData = {
+      totalAmount: cartStore.totalPrice,
+      name: form.value.name,
+      phone: form.value.phone,
+      address: form.value.address,
+      orderType: form.value.orderType,
+      paymentMethod: form.value.paymentMethod,
+      status: 'Pending'
+    };
+
+    console.log('Placing order with data:', orderData);
+    console.log('Cart items:', cartStore.items);
+
+    // Step 1: Create order, Step 2: Add order items
+    const result = await orderStore.placeOrder(orderData, cartStore.items);
+    
     toast.success('Order placed successfully!')
     cartStore.clearCart()
-    router.push('/')
+    
+    // Refresh orders list before navigating
+    await orderStore.fetchOrders()
+    router.push('/orders')
   } catch (err) {
-    toast.error('Failed to place order')
+    const errorMsg = err.message || 'Failed to place order';
+    toast.error(errorMsg);
   } finally {
     isSubmitting.value = false
   }
@@ -185,9 +220,6 @@ const finalTotal = computed(() => cartStore.totalPrice - discount.value);
           <div class="form-group">
             <label>Order Type</label>
             <div class="radio-group">
-              <label class="radio-label">
-                <input type="radio" v-model="form.orderType" value="Dine-in"> Dine-in
-              </label>
               <label class="radio-label">
                 <input type="radio" v-model="form.orderType" value="Take-away"> Take-away
               </label>

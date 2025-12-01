@@ -1,35 +1,51 @@
 <script setup>
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useToast } from '../composables/useToast'
 import { useRouter } from 'vue-router'
 import { UserPlus } from 'lucide-vue-next'
+import api from '../api/client'
 
 const auth = useAuthStore()
 const toast = useToast()
 const router = useRouter()
+const isLoading = ref(false)
+const userDetails = ref(null)
 
 function goToLogin() {
   router.push('/login')
 }
 
-onMounted(async () => {
+const fetchUserDetails = async () => {
+  if (!auth.user?.id) return
+  
+  isLoading.value = true
   try {
-    if (!auth.user) {
-      await auth.fetchMe()
-    }
+    const response = await api.get(`user/getDetails/${auth.user.id}`)
+    userDetails.value = response.data.payload.responseData
+    
+    // Update auth store with fresh data
+    auth.user = userDetails.value
+    localStorage.setItem('user', JSON.stringify(userDetails.value))
   } catch (err) {
-    toast.error(err.response?.data?.error || 'Failed to load profile')
+    const errorMsg = err.response?.data?.error?.message || 
+                     err.response?.data?.message || 
+                     'Failed to load profile'
+    toast.error(errorMsg)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(async () => {
+  if (auth.user) {
+    await fetchUserDetails()
   }
 })
 
 const refresh = async () => {
-  try {
-    await auth.fetchMe()
-    toast.success('Profile refreshed')
-  } catch (err) {
-    toast.error('Failed to refresh')
-  }
+  await fetchUserDetails()
+  toast.success('Profile refreshed')
 }
 </script>
 
@@ -60,24 +76,36 @@ const refresh = async () => {
         </div>
       </div>
 
-      <div class="card-body">
-        <div class="info-grid">
-          <!-- <div class="label">User ID</div>
-          <div class="value">{{ auth.user.id }}</div> -->
+      <div v-if="isLoading" class="loading-state">
+        <p>Loading profile...</p>
+      </div>
 
+      <div v-else class="card-body">
+        <div class="info-grid">
           <div class="label">Full name</div>
-          <div class="value">{{ auth.user.name }}</div>
+          <div class="value">{{ auth.user.name || '-' }}</div>
 
           <div class="label">Email</div>
-          <div class="value">{{ auth.user.email }}</div>
+          <div class="value">{{ auth.user.email || '-' }}</div>
+
+          <div class="label">Phone Number</div>
+          <div class="value">{{ auth.user.phoneNumber || 'Not provided' }}</div>
+
+          <div class="label">Address</div>
+          <div class="value">{{ auth.user.address || 'Not provided' }}</div>
 
           <div class="label">Role</div>
-          <div class="value">{{ auth.user.role }}</div>
+          <div class="value">{{ auth.user.role || '-' }}</div>
+
+          <div class="label">Joined</div>
+          <div class="value">{{ auth.user.createdAt || '-' }}</div>
         </div>
       </div>
 
       <div class="actions">
-        <!-- <button class="btn-primary" @click="refresh">Refresh</button> -->
+        <button class="btn-secondary" @click="refresh" :disabled="isLoading">
+          {{ isLoading ? 'Refreshing...' : 'Refresh' }}
+        </button>
         <button class="btn-primary" @click="auth.logout()">Logout</button>
       </div>
     </div>
@@ -94,10 +122,14 @@ const refresh = async () => {
 .header-info .name { margin:0; font-size:1.2rem }
 .header-info .meta { color:var(--color-text-light); font-size:0.9rem }
 .card-body { padding:0.5rem 0 }
+.loading-state { text-align: center; padding: 2rem; color: #666; }
 .info-grid { display:grid; grid-template-columns: 150px 1fr; gap: 0.5rem 1.25rem; align-items:center }
 .label { color:var(--color-text-light); font-weight:600 }
 .value { color:var(--color-text) }
 .actions { margin-top: 1.25rem; display:flex; gap: 0.75rem }
+.btn-secondary { padding: 0.7rem 1.2rem; background: #f5f5f5; color: var(--color-text); border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+.btn-secondary:hover { background: #e5e5e5; }
+.btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 @media (max-width:600px) {
   .info-grid { grid-template-columns: 1fr }
