@@ -16,10 +16,8 @@ const reviewStates = ref({});
 const initReviewState = (orderId) => {
   if (!reviewStates.value[orderId]) {
     reviewStates.value[orderId] = {
-      isWriting: false,
       rating: 0,
-      hoveredRating: 0,
-      comment: ''
+      hoveredRating: 0
     };
   }
 };
@@ -39,78 +37,131 @@ const clearHoveredRating = (orderId) => {
   reviewStates.value[orderId].hoveredRating = 0;
 };
 
-const toggleReviewForm = (orderId) => {
-  initReviewState(orderId);
-  reviewStates.value[orderId].isWriting = !reviewStates.value[orderId].isWriting;
-};
+
 
 const submitReview = (orderId) => {
+  initReviewState(orderId);
   const review = reviewStates.value[orderId];
   
   if (!review.rating) {
     toast.error('Please select a rating');
     return;
   }
-  
-  if (!review.comment.trim()) {
-    toast.error('Please write a review');
-    return;
-  }
 
   // TODO: Send review to API
   console.log('Submitting review for order:', orderId, {
-    rating: review.rating,
-    comment: review.comment
+    rating: review.rating
   });
 
   toast.success('Review submitted successfully!');
   
-  // Reset the form
-  review.isWriting = false;
+  // Reset the rating
   review.rating = 0;
-  review.comment = '';
 };
 
-const cancelReview = (orderId) => {
-  const review = reviewStates.value[orderId];
-  review.isWriting = false;
-  review.rating = 0;
-  review.hoveredRating = 0;
-  review.comment = '';
-};
+
 
 // Cancel Order functionality
 const cancelModal = ref({
   isOpen: false,
-  orderId: null,
-  reason: '',
-  otherReason: ''
+  orderId: null
 });
 
-const cancellationReasons = [
-  'Changed my mind',
-  'Ordered by mistake',
-  'Taking too long',
-  'Found a better price elsewhere',
-  'Need to modify my order',
-  'Other'
-];
+const openCancelModal = (orderId) => {
+  cancelModal.value = {
+    isOpen: true,
+    orderId
+  };
+};
+
+const closeCancelModal = () => {
+  cancelModal.value = {
+    isOpen: false,
+    orderId: null
+  };
+};
+
+const confirmCancel = async () => {
+  try {
+    await orderStore.deleteOrder(cancelModal.value.orderId);
+    
+    // Mark order as cancelled in localStorage
+    const orderStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
+    orderStatuses[cancelModal.value.orderId] = {
+      status: 'Cancelled',
+      timestamp: Date.now()
+    };
+    localStorage.setItem('orderStatuses', JSON.stringify(orderStatuses));
+    
+    // Update order status in local state
+    const order = orderStore.orders.find(o => o.id === cancelModal.value.orderId);
+    if (order) {
+      order.status = 'Cancelled';
+    }
+    
+    toast.success('Order cancelled successfully');
+    closeCancelModal();
+  } catch (error) {
+    toast.error('Failed to cancel order');
+    console.error('Cancel order error:', error);
+  }
+};
+
+// Get order status from localStorage
+const getOrderStatus = (orderId, createdAt) => {
+  const orderStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
+  
+  // If order is marked as cancelled, return that
+  if (orderStatuses[orderId]?.status === 'Cancelled') {
+    return 'Cancelled';
+  }
+  
+  // Check if 10 minutes have passed since order creation
+  const orderTime = new Date(createdAt).getTime();
+  const tenMinutes = 10 * 60 * 1000;
+  const elapsed = Date.now() - orderTime;
+  
+  if (elapsed >= tenMinutes) {
+    // Auto-mark as delivered and save to localStorage
+    if (!orderStatuses[orderId] || orderStatuses[orderId].status !== 'Delivered') {
+      orderStatuses[orderId] = {
+        status: 'Delivered',
+        timestamp: Date.now()
+      };
+      localStorage.setItem('orderStatuses', JSON.stringify(orderStatuses));
+    }
+    return 'Delivered';
+  }
+  
+  return 'In Progress';
+};
+
+// Update order statuses
+const updateOrderStatuses = () => {
+  orderStore.orders.forEach(order => {
+    order.status = getOrderStatus(order.id, order.createdAt);
+  });
+};
 
 // Timer update interval
 let timerInterval = null;
 
 onMounted(async () => {
-  timerInterval = setInterval(() => {
-    currentTime.value = Date.now();
-  }, 1000);
-  
   // Fetch orders from API
   try {
     await orderStore.fetchOrders();
+    // Update statuses after fetching
+    updateOrderStatuses();
   } catch (error) {
     toast.error('Failed to load orders');
     console.error('Error fetching orders:', error);
   }
+  
+  // Update timer and check statuses every second
+  timerInterval = setInterval(() => {
+    currentTime.value = Date.now();
+    updateOrderStatuses();
+  }, 1000);
 });
 
 onUnmounted(() => {
@@ -121,20 +172,20 @@ onUnmounted(() => {
 
 // Calculate if order can be cancelled and time remaining
 const canCancelOrder = (order) => {
-  if (order.status !== 'In Progress' && order.status !== 'Pending') return false;
+  if (order.status === 'Cancelled' || order.status === 'Delivered') return false;
   
   const orderTime = new Date(order.createdAt).getTime();
-  const fiveMinutes = 5 * 60 * 1000;
+  const tenMinutes = 10 * 60 * 1000;
   const elapsed = currentTime.value - orderTime;
   
-  return elapsed < fiveMinutes;
+  return elapsed < tenMinutes;
 };
 
 const getTimeRemaining = (order) => {
   const orderTime = new Date(order.createdAt).getTime();
-  const fiveMinutes = 5 * 60 * 1000;
+  const tenMinutes = 10 * 60 * 1000;
   const elapsed = currentTime.value - orderTime;
-  const remaining = fiveMinutes - elapsed;
+  const remaining = tenMinutes - elapsed;
   
   if (remaining <= 0) return '0:00';
   
@@ -144,50 +195,7 @@ const getTimeRemaining = (order) => {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
-const openCancelModal = (orderId) => {
-  cancelModal.value = {
-    isOpen: true,
-    orderId,
-    reason: '',
-    otherReason: ''
-  };
-};
 
-const closeCancelModal = () => {
-  cancelModal.value = {
-    isOpen: false,
-    orderId: null,
-    reason: '',
-    otherReason: ''
-  };
-};
-
-const confirmCancellation = () => {
-  const { orderId, reason, otherReason } = cancelModal.value;
-  
-  if (!reason) {
-    toast.error('Please select a cancellation reason');
-    return;
-  }
-  
-  if (reason === 'Other' && !otherReason.trim()) {
-    toast.error('Please provide a reason');
-    return;
-  }
-  
-  // TODO: Send cancellation to API
-  const finalReason = reason === 'Other' ? otherReason : reason;
-  console.log('Cancelling order:', orderId, 'Reason:', finalReason);
-  
-  // Update order status
-  const order = orderStore.orders.find(o => o.id === orderId);
-  if (order) {
-    order.status = 'Cancelled';
-  }
-  
-  toast.success('Order cancelled successfully');
-  closeCancelModal();
-};
 
 // Removed dummyOrders - now using real data from orderStore
 </script>
@@ -283,15 +291,7 @@ const confirmCancellation = () => {
 
         <!-- Review Section (Full Width Below Card) -->
         <div v-if="order.status === 'Delivered'" class="review-section">
-          <button 
-            v-if="!reviewStates[order.id]?.isWriting" 
-            @click="toggleReviewForm(order.id)"
-            class="review-btn"
-          >
-            Write a Review
-          </button>
-
-          <div v-else class="review-form">
+          <div class="review-form">
             <h4>Rate Your Experience</h4>
             
             <!-- Star Rating -->
@@ -312,24 +312,6 @@ const confirmCancellation = () => {
                 @mouseleave="clearHoveredRating(order.id)"
               />
             </div>
-
-            <!-- Review Text -->
-            <textarea
-              v-model="reviewStates[order.id].comment"
-              placeholder="Share your experience with this order..."
-              class="review-textarea"
-              rows="4"
-            ></textarea>
-
-            <!-- Action Buttons -->
-            <div class="review-actions">
-              <button @click="cancelReview(order.id)" class="btn-cancel">
-                Cancel
-              </button>
-              <button @click="submitReview(order.id)" class="btn-submit">
-                Submit Review
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -340,50 +322,26 @@ const confirmCancellation = () => {
       <p>No orders yet.</p>
     </div>
 
-    <!-- Cancellation Modal -->
+    <!-- Cancel Confirmation Modal -->
     <div v-if="cancelModal.isOpen" class="modal-overlay" @click="closeCancelModal">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content cancel-modal" @click.stop>
         <div class="modal-header">
-          <h3>Cancel Order</h3>
-          <button @click="closeCancelModal" class="modal-close">
-            <XCircle :size="24" />
-          </button>
+          <div class="modal-icon-warning">
+            <XCircle :size="48" />
+          </div>
+          <h3>Cancel Order?</h3>
         </div>
 
         <div class="modal-body">
-          <p class="modal-description">Please select a reason for cancelling this order:</p>
-          
-          <div class="reason-options">
-            <label 
-              v-for="reason in cancellationReasons" 
-              :key="reason"
-              class="reason-option"
-            >
-              <input 
-                type="radio" 
-                :value="reason" 
-                v-model="cancelModal.reason"
-                name="cancellation-reason"
-              />
-              <span class="reason-label">{{ reason }}</span>
-            </label>
-          </div>
-
-          <textarea
-            v-if="cancelModal.reason === 'Other'"
-            v-model="cancelModal.otherReason"
-            placeholder="Please specify your reason..."
-            class="other-reason-input"
-            rows="3"
-          ></textarea>
+          <p class="modal-description">Are you sure you want to cancel this order? This action cannot be undone.</p>
         </div>
 
         <div class="modal-footer">
           <button @click="closeCancelModal" class="btn-secondary">
             Go Back
           </button>
-          <button @click="confirmCancellation" class="btn-danger">
-            Confirm Cancellation
+          <button @click="confirmCancel" class="btn-danger">
+            Cancel Order
           </button>
         </div>
       </div>
@@ -729,6 +687,26 @@ const confirmCancellation = () => {
   border-bottom: 1px solid #e5e5e5;
 }
 
+.cancel-modal .modal-header {
+  flex-direction: column;
+  text-align: center;
+  gap: 1rem;
+  border-bottom: none;
+  padding-bottom: 0.5rem;
+}
+
+.modal-icon-warning {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #fee2e2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+  margin: 0 auto;
+}
+
 .modal-header h3 {
   margin: 0;
   font-size: 1.25rem;
@@ -754,10 +732,21 @@ const confirmCancellation = () => {
   padding: 1.5rem;
 }
 
+.cancel-modal .modal-body {
+  padding: 1rem 1.5rem;
+  text-align: center;
+}
+
 .modal-description {
   margin-bottom: 1.25rem;
   color: #666;
   font-size: 0.95rem;
+}
+
+.cancel-modal .modal-description {
+  margin-bottom: 0;
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
 .reason-options {

@@ -110,12 +110,36 @@ export const useOrderStore = defineStore('order', () => {
     orders.value.push(order);
   }
 
+  async function deleteOrder(orderId) {
+    isLoading.value = true;
+    error.value = null;
+    
+    try {
+      await api.delete(`order/delete/${orderId}`);
+      
+      // Remove order from local state
+      orders.value = orders.value.filter(order => order.id !== orderId);
+      
+      return { success: true };
+    } catch (err) {
+      const errorMsg = err.response?.data?.error?.message || 
+                       err.response?.data?.message || 
+                       'Failed to delete order';
+      error.value = errorMsg;
+      console.error('Delete order error:', err);
+      throw new Error(errorMsg);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   return { 
     orders, 
     isLoading, 
     error, 
     fetchOrders,
     placeOrder, 
-    addOrder 
+    addOrder,
+    deleteOrder
   };
 });
